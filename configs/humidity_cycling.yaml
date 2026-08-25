@@ -1,0 +1,39 @@
+# Wet/dry cycling. The moisture level at the far face rises and falls with the
+# exposure, which makes plain that this model carries no damage history: nothing
+# accumulates, so the criterion is met only while the film is wet enough.
+#
+# A humidity schedule forces the finite-volume solver -- the analytical series
+# assumes a constant surface condition and cannot express this.
+name: epoxy_humidity_cycling
+
+film:
+  thickness_um: 150
+  exposure: one_sided
+
+polymer:
+  diffusivity_ref: 5.0e-13
+  temperature_ref_c: 25
+  activation_energy_kj: 50
+  isotherm:
+    m_ref_pct: 2.2
+
+exposure:
+  temperature_c: 65
+  # Uptake is normalized against equilibrium at RH = 0.95, the wet leg.
+  relative_humidity: 0.95
+  duration_days: 40
+  n_times: 1200
+  time_spacing: linear
+  humidity_schedule:
+    type: cycle
+    time_unit: d
+    high: 0.95
+    low: 0.05
+    period: 8
+    n_cycles: 5
+    duty: 0.5
+    ramp: 0.25
+
+threshold:
+  basis: wt_pct
+  value: 1.5

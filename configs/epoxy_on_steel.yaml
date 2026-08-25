@@ -1,0 +1,45 @@
+# A structural epoxy adhesive film on an impermeable substrate, held at 60 degC
+# and 85% RH -- a common accelerated hygrothermal ageing condition.
+#
+# Every number here is a MODEL PARAMETER chosen to be literature-plausible for
+# this class of adhesive. None is a measurement of a specific product, and the
+# model reports moisture transport only -- not adhesive strength.
+name: epoxy_on_steel
+
+film:
+  thickness_um: 200
+  # One-sided: the substrate is impermeable, so the bondline is the last place
+  # in the film to wet. That is what makes thickness matter.
+  exposure: one_sided
+
+polymer:
+  name: epoxy adhesive
+  # Reference diffusivity at the reference temperature below. Around 1e-13 m2/s
+  # at 25 degC is a plausible value for water in a cured structural epoxy.
+  diffusivity_ref: 1.0e-13
+  temperature_ref_c: 25
+  # 50 kJ/mol puts D about 18x higher at 75 degC than at 25 degC.
+  activation_energy_kj: 50
+  isotherm:
+    # Henry's law: equilibrium uptake is linear in relative humidity.
+    m_ref_pct: 2.4
+    temperature_ref_c: 25
+    # Zero makes equilibrium uptake temperature-independent, so temperature
+    # changes only how fast moisture arrives.
+    enthalpy_sorption_kj: 0
+
+exposure:
+  temperature_c: 60
+  relative_humidity: 0.85
+  duration_days: 10
+  n_times: 400
+
+threshold:
+  # "Moisture at the far face has reached half of its equilibrium value."
+  # A transport criterion, used as a proxy for potential performance change.
+  basis: normalized
+  value: 0.5
+
+sweep:
+  thickness_um: [50, 100, 200, 400, 800]
+  temperature_c: [20, 30, 40, 50, 60, 70, 80]

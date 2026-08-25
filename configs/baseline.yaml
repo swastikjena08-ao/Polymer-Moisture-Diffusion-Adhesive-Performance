@@ -1,0 +1,15 @@
+# Minimal config: every optional key omitted so the defaults show through.
+name: baseline
+
+film:
+  thickness_um: 100
+
+polymer:
+  diffusivity_ref: 5.0e-13
+  isotherm:
+    m_ref_pct: 2.0
+
+exposure:
+  temperature_c: 40
+  relative_humidity: 0.9
+  duration_days: 5

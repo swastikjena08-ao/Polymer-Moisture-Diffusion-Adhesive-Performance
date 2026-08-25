@@ -1,0 +1,77 @@
+# A structural DGEBA/amine epoxy film bonded to grit-blasted steel, held at
+# 60 degC and 85% RH -- a common accelerated hygrothermal ageing condition.
+#
+# Parameter values are literature-plausible for this class of adhesive, not
+# measurements of a specific product. The transport numbers can be replaced
+# with fitted values; the adhesion numbers are modelling choices and should be
+# treated as such (see the standing note in the README).
+name: epoxy_on_steel
+
+film:
+  thickness_um: 200
+  # One-sided: the steel substrate is impermeable, so the bondline is the last
+  # place in the film to wet. That is the whole point of tracking it.
+  exposure: one_sided
+
+polymer:
+  name: DGEBA/amine epoxy
+  # Diffusivity at the reference temperature below. Around 2e-13 m2/s at 25 degC
+  # is typical for water in a cured structural epoxy.
+  diffusivity_ref: 1.0e-13
+  temperature_ref_c: 25
+  # 50 kJ/mol puts D about 18x higher at 75 degC than at 25 degC.
+  activation_energy: 50.0e3
+  # Zero keeps diffusion Fickian and lets the exact series solution be used.
+  # Raise it to model water plasticizing the matrix it is diffusing through.
+  conc_dependence: 0.0
+  tg_dry_c: 140
+  tg_model: linear
+  tg_depression_per_pct: 12
+  tg_floor_c: 0
+  isotherm:
+    # Saturation uptake at RH = 1 and the reference temperature.
+    m_ref_pct: 2.4
+    rh_ref: 1.0
+    # Below 1 gives the concave isotherm epoxies show: uptake outruns humidity
+    # at low RH and flattens as saturation approaches.
+    exponent: 0.8
+    # Positive: saturation uptake rises weakly with temperature.
+    enthalpy_sorption: 6.0e3
+    temperature_ref_c: 25
+
+exposure:
+  temperature_c: 60
+  relative_humidity: 0.85
+  duration_days: 90
+  n_times: 400
+
+adhesion:
+  # These are modelling choices, not measurements. They are set here so that all
+  # three mechanisms are visible on one plot: the bondline wets in a few hours,
+  # plasticization and thermal softening take an immediate but partial bite, and
+  # irreversible hydrolysis then carries ARI down over days. Pick a very soft
+  # resin or a very aggressive plasticization gain and the threshold crossing
+  # collapses onto the wetting time, which tells you nothing you did not already
+  # know from the uptake curve.
+  # Driven by absolute water content at the bondline, in wt%, so the gain is a
+  # loss coefficient per weight percent of water. That is what makes a 40% RH
+  # exposure genuinely milder than a 90% one.
+  moisture_reference_pct: 1.0
+  plasticization_gain: 0.15
+  plasticization_exponent: 1.0
+  plasticization_floor: 0.55
+  # Softening reaches its half point 20 K below the wet Tg, over an 8 K width.
+  tg_offset: 20
+  tg_width: 8
+  # Irreversible interfacial hydrolysis: slow at 25 degC, strongly activated.
+  hydrolysis_rate_ref: 7.0e-8
+  hydrolysis_activation: 60.0e3
+  hydrolysis_exponent: 1.0
+  hydrolysis_max_loss: 0.55
+  temperature_ref_c: 25
+
+ari_threshold: 0.7
+
+sweep:
+  thickness_um: [50, 100, 200, 400, 800]
+  temperature_c: [25, 40, 55, 70, 85]

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hygroadh"
+version = "0.1.0"
+description = "Diffusion-based prediction of moisture uptake and adhesion retention in polymer films"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.23"]
+
+[project.optional-dependencies]
+# YAML configs only; JSON configs work with no optional dependency at all.
+yaml = ["pyyaml>=5.4"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+hygroadh = "hygroadh.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error::RuntimeWarning"]
+
+[tool.setuptools.package-data]
+hygroadh = ["*.html"]

@@ -1,0 +1,1330 @@
+<!-- Dashboard for the polymer moisture-diffusion study. Served locally by
+     hygroadh.dashboard. Self-contained: no external scripts, styles, or fonts.
+     All physics is computed server-side by the Python model, so there is no
+     second implementation that can drift from it. -->
+<meta charset="utf-8">
+<title>Polymer Moisture Diffusion</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --ink: #16191d; --muted: #5a6472;
+    --line: #d5dae1; --rule: #b9c1cb; --accent: #1f4e9c; --accent-soft: #eaf0fa;
+    --warn-bg: #fdf6e3; --warn-line: #b7791f; --note-bg: #f0f3f7;
+    --s1: #1f4e9c; --s2: #b3441d; --s3: #1b6b4a; --s4: #6b3fa0; --s5: #8a6d1f;
+    --grid: #e4e8ee;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1116; --panel: #161a20; --ink: #e4e8ee; --muted: #98a2b1;
+      --line: #29303a; --rule: #3a434f; --accent: #7aa7ee; --accent-soft: #1a2331;
+      --warn-bg: #241f12; --warn-line: #d0a144; --note-bg: #1a1f27;
+      --s1: #7aa7ee; --s2: #e8895f; --s3: #5cc596; --s4: #b79ae8; --s5: #d8bb63;
+      --grid: #242b34;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: var(--sans); font-size: 14.5px; line-height: 1.55; }
+
+  header { background: var(--panel); border-bottom: 2px solid var(--rule);
+           padding: 22px 28px 18px; }
+  header h1 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: -0.015em; }
+  header .sub { color: var(--muted); font-size: 14px; margin-top: 3px; }
+  header .rq { margin-top: 12px; padding: 10px 14px; background: var(--accent-soft);
+               border-left: 3px solid var(--accent); border-radius: 0 5px 5px 0;
+               max-width: 80ch; font-size: 14px; }
+  header .rq b { display: block; font-size: 11px; text-transform: uppercase;
+                 letter-spacing: 0.09em; color: var(--accent); margin-bottom: 3px; }
+  header .status { margin-top: 10px; font-family: var(--mono); font-size: 11.5px;
+                   color: var(--muted); }
+
+  nav { background: var(--panel); border-bottom: 1px solid var(--line);
+        padding: 7px 28px; position: sticky; top: 0; z-index: 20;
+        display: flex; gap: 4px; flex-wrap: wrap; font-size: 12px; }
+  nav a { color: var(--muted); text-decoration: none; padding: 3px 8px;
+          border-radius: 4px; }
+  nav a:hover { background: var(--accent-soft); color: var(--accent); }
+
+  /* Two-column shell: controls pinned left, results filling the rest. */
+  .layout { display: grid; grid-template-columns: 348px minmax(0, 1fr);
+            align-items: start; }
+  aside { position: sticky; top: 38px; align-self: start;
+          height: calc(100vh - 38px); overflow-y: auto;
+          background: var(--panel); border-right: 2px solid var(--rule);
+          padding: 18px 18px 40px; }
+  aside > h2 { font-size: 15.5px; margin: 0 0 4px; font-weight: 650;
+               padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
+  aside > h2 .num { color: var(--muted); font-weight: 500; margin-right: 8px;
+                    font-family: var(--mono); font-size: 13px; }
+  aside > p.side-lead { color: var(--muted); font-size: 12px; margin: 8px 0 4px; }
+  @media (max-width: 1080px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { position: static; height: auto; overflow: visible;
+            border-right: 0; border-bottom: 2px solid var(--rule); }
+  }
+  main { padding: 22px 28px 70px; min-width: 0; }
+  section { margin-bottom: 30px; scroll-margin-top: 56px; }
+  section > h2 { font-size: 15.5px; margin: 0 0 2px; font-weight: 650;
+                 padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
+  section > h2 .num { color: var(--muted); font-weight: 500; margin-right: 8px;
+                      font-family: var(--mono); font-size: 13px; }
+  section > p.lead { color: var(--muted); font-size: 13.5px; margin: 7px 0 14px;
+                     max-width: 90ch; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line);
+           border-radius: 7px; padding: 13px 15px 9px; }
+  .panel h3 { font-size: 13px; margin: 0 0 2px; font-weight: 650;
+              display: flex; align-items: baseline; gap: 8px; }
+  .panel h3 .dl { margin-left: auto; font-size: 10.5px; font-weight: 500;
+                  color: var(--muted); cursor: pointer; border: 1px solid var(--line);
+                  border-radius: 4px; padding: 1px 6px; background: none;
+                  font-family: var(--sans); }
+  .panel h3 .dl:hover { color: var(--accent); border-color: var(--accent); }
+  .panel p.note { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+           gap: 18px; }
+
+  /* Sidebar controls */
+  .inputs { display: block; }
+  .cgroup { border: 0; margin: 0; padding: 12px 0 2px;
+            border-top: 1px solid var(--line); }
+  .cgroup:first-child { border-top: 0; padding-top: 8px; }
+  .cgroup > legend { font-size: 10px; text-transform: uppercase;
+                     letter-spacing: 0.09em; color: var(--muted); font-weight: 700;
+                     padding: 0; margin-bottom: 2px; }
+  .ctl { margin-bottom: 11px; }
+  .ctl .row { display: flex; justify-content: space-between; align-items: baseline;
+              gap: 8px; }
+  .ctl label { font-size: 13px; font-weight: 550; }
+  .ctl .unit { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .ctl .pair { display: flex; align-items: center; gap: 9px; margin-top: 4px; }
+  .ctl input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent);
+                           margin: 0; }
+  .ctl input[type=number], .ctl select {
+      width: 92px; flex: 0 0 92px; padding: 4px 6px; background: var(--bg);
+      color: var(--ink); border: 1px solid var(--line); border-radius: 5px;
+      font-family: var(--mono); font-size: 12.5px; }
+  .ctl select { width: 100%; font-family: var(--sans); }
+  .ctl .hint { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .ctl input.invalid { border-color: var(--warn-line); background: var(--warn-bg); }
+  .banner-retry { margin-left: 8px; }
+  .tag { display: inline-block; font-size: 9.5px; text-transform: uppercase;
+         letter-spacing: 0.07em; padding: 1px 5px; border-radius: 3px;
+         border: 1px solid var(--warn-line); color: var(--warn-line);
+         background: var(--warn-bg); font-weight: 650; vertical-align: 1px; }
+  .runbar { margin-top: 16px; padding-top: 14px; border-top: 2px solid var(--rule);
+            display: flex; flex-direction: column; gap: 9px; }
+  button.plain { font-family: var(--sans); font-size: 13px; padding: 7px 13px;
+      border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+      border-radius: 6px; cursor: pointer; }
+  button.plain:hover { border-color: var(--accent); color: var(--accent); }
+  .runbar .auto { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
+  /* Section 4 -- result cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+           gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line);
+          border-left: 3px solid var(--accent); border-radius: 5px;
+          padding: 11px 13px; }
+  .card .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em;
+             color: var(--muted); font-weight: 650; }
+  .card .v { font-family: var(--mono); font-size: 19px; font-weight: 650;
+             margin-top: 4px; letter-spacing: -0.02em; line-height: 1.2; }
+  .card .u { font-size: 11.5px; color: var(--muted); font-weight: 400;
+             font-family: var(--sans); }
+  .card .sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .card.calc { border-left-color: var(--s3); }
+
+  /* charts */
+  .chartwrap { width: 100%; overflow-x: auto; }
+  svg.chart { display: block; width: 100%; height: auto; }
+  .legend { display: flex; gap: 15px; flex-wrap: wrap; font-size: 11.5px;
+            margin: 3px 0 7px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 15px; height: 0; border-top-width: 2.5px;
+              border-top-style: solid; display: inline-block; }
+
+  /* tables */
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { text-align: right; padding: 5px 9px; border-bottom: 1px solid var(--line); }
+  td { font-family: var(--mono); }
+  th:first-child, td:first-child { text-align: left; font-family: var(--sans); }
+  th { color: var(--muted); font-weight: 650; font-size: 10.5px;
+       text-transform: uppercase; letter-spacing: 0.05em;
+       border-bottom: 1px solid var(--rule); }
+  tr.hi td { background: var(--accent-soft); font-weight: 650; }
+  .bar { height: 9px; border-radius: 2px; display: block; background: var(--s1); }
+
+  /* prose panels */
+  .prose { background: var(--panel); border: 1px solid var(--line);
+           border-radius: 7px; padding: 14px 18px; }
+  .prose ul { margin: 6px 0 0; padding-left: 20px; }
+  .prose li { font-size: 13px; margin-bottom: 3px; }
+  .prose p { font-size: 13px; margin: 0 0 8px; }
+  .callout { border-left: 3px solid var(--warn-line); background: var(--warn-bg);
+             border-radius: 0 6px 6px 0; padding: 11px 15px; font-size: 13px;
+             margin-bottom: 14px; }
+  .callout b { display: block; margin-bottom: 3px; }
+  .err { border-left-color: #b3441d; background: var(--warn-bg); color: var(--ink); }
+  /* Equations are MathML, which every current browser lays out natively using a
+     system math font. No script, no stylesheet, no webfont -- the page stays
+     self-contained. */
+  .eq { background: var(--note-bg); padding: 11px 14px; border-radius: 5px;
+        margin: 9px 0; overflow-x: auto; }
+  .eq math { font-size: 1.28em; display: block; margin: 0 auto; }
+  .eq .caption { font-size: 12px; color: var(--muted); text-align: center;
+                 margin-top: 6px; }
+  math { font-style: normal; }
+  /* Inline math sits in running text, so it uses solidus form rather than
+     stacked fractions -- a stacked fraction inflates the line height. */
+  .im { font-size: 1.05em; }
+  .chain { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+           font-size: 12.5px; margin: 4px 0 12px; color: var(--muted); }
+  .chain code { font-family: var(--mono); background: var(--note-bg);
+                padding: 2px 7px; border-radius: 4px; color: var(--ink); }
+  .animrow { display: flex; gap: 16px; flex-wrap: wrap; margin: 2px 0 4px; }
+  .animrow label { font-size: 12.5px; display: inline-flex; align-items: center;
+                   gap: 6px; cursor: pointer; }
+  .animrow input { accent-color: var(--accent); margin: 0; }
+  .animrow label:has(input:disabled) { color: var(--muted); cursor: default; }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
+  .slider-row input { flex: 1; accent-color: var(--accent); }
+  .slider-row .readout { font-family: var(--mono); font-size: 12px;
+                         color: var(--accent); min-width: 15ch; font-weight: 600; }
+  footer { border-top: 1px solid var(--line); padding: 16px 28px 40px;
+           color: var(--muted); font-size: 12px; }
+</style>
+
+<header>
+  <h1>Polymer Moisture Diffusion &amp; Adhesive Performance</h1>
+  <div class="sub">Computational study of moisture transport in polymer adhesive films</div>
+  <div class="rq">
+    <b>Research question</b>
+    How do polymer-film thickness, temperature, and water diffusivity influence the
+    time-dependent loss of adhesive performance? Moisture arrival at the far face of
+    the film is used as a proxy for potential performance change &mdash; this model
+    predicts moisture transport, not measured bond strength.
+  </div>
+  <div class="status" id="status">initialising</div>
+</header>
+
+<nav>
+  <a href="#s1">1 Inputs</a><a href="#s2">2 Temperature effect</a>
+  <a href="#s3">3 Diffusion profile</a><a href="#s4">4 Key results</a>
+  <a href="#s5">5 Thickness study</a><a href="#s6">6 Diffusivity study</a>
+  <a href="#s7">7 Temperature study</a><a href="#s8">8 Comparison</a>
+  <a href="#s9">9 Assumptions</a><a href="#s10">10 Export</a>
+</nav>
+
+<div class="layout">
+<aside id="s1">
+  <h2><span class="num">1</span>Model inputs</h2>
+  <p class="side-lead">
+    Results update when you change an input. Drag a slider or enter a value.
+    <span class="tag">Model parameter</span> values are assumptions, not universal
+    material constants. Inputs are converted to SI units; temperature is converted
+    to kelvin for the Arrhenius calculation.
+  </p>
+  <div class="inputs" id="inputs"></div>
+  <div class="runbar">
+    <button class="plain" id="reset">Reset defaults</button>
+    <span class="auto" id="autonote">Results update automatically as inputs change.</span>
+  </div>
+</aside>
+
+<main>
+  <div id="banner"></div>
+
+  <!-- ================= SECTION 4 (results first, so numbers are near the top) -->
+  <section id="s4">
+    <h2><span class="num">4</span>Key results</h2>
+    <p class="lead">
+      Blue border marks an input; green marks a calculated quantity.
+    </p>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <!-- ================= SECTION 2 ================= -->
+  <section id="s2">
+    <h2><span class="num">2</span>Temperature effect</h2>
+    <div class="chain">
+      <code>T &uarr;</code> &rarr; <code>D(T) &uarr;</code> &rarr;
+      <code>transport rate &uarr;</code> &rarr; <code>threshold time &darr;</code>
+    </div>
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <mi>D</mi><mo stretchy="false">(</mo><mi>T</mi><mo stretchy="false">)</mo>
+          <mo>=</mo>
+          <msub><mi>D</mi><mi>ref</mi></msub>
+          <mi>exp</mi><mo>&#x2061;</mo>
+          <mrow><mo>[</mo>
+            <mrow>
+              <mo>&#x2212;</mo>
+              <mfrac><msub><mi>E</mi><mi>a</mi></msub><mi>R</mi></mfrac>
+              <mrow><mo>(</mo>
+                <mrow>
+                  <mfrac><mn>1</mn><mi>T</mi></mfrac>
+                  <mo>&#x2212;</mo>
+                  <mfrac><mn>1</mn><msub><mi>T</mi><mi>ref</mi></msub></mfrac>
+                </mrow>
+              <mo>)</mo></mrow>
+            </mrow>
+          <mo>]</mo></mrow>
+        </mrow>
+      </math>
+      <div class="caption">
+        Temperature in kelvin. <math class="im"><msub><mi>D</mi><mi>ref</mi></msub></math>
+        and <math class="im"><msub><mi>E</mi><mi>a</mi></msub></math> are model
+        parameters you set; <math class="im"><mi>R</mi></math> is the gas constant.
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <h3>A. Temperature &rarr; diffusivity
+          <button class="dl" data-svg="ch-dt" data-name="temperature-diffusivity">SVG</button></h3>
+        <p class="note">Arrhenius relationship over the study range. The marker is the current temperature.</p>
+        <div class="chartwrap"><svg class="chart" id="ch-dt" viewBox="0 0 500 300"></svg></div>
+      </div>
+      <div class="panel">
+        <h3>B. Temperature &rarr; penetration time
+          <button class="dl" data-svg="ch-tp" data-name="temperature-penetration-time">SVG</button></h3>
+        <p class="note">One full simulation per point. Log time axis, since the range spans decades.</p>
+        <div class="chartwrap"><svg class="chart" id="ch-tp" viewBox="0 0 500 300"></svg></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:18px">
+      <h3>C. Temperature comparison</h3>
+      <p class="note">The chain above, as numbers. Highlighted row is the current temperature.</p>
+      <div id="tbl-tcompare"></div>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 3 ================= -->
+  <section id="s3">
+    <h2><span class="num">3</span>Moisture diffusion profile</h2>
+    <p class="lead">
+      Concentration through the film thickness, measured from the wetted face.
+      The right edge is the far face and, for a film on an impermeable substrate,
+      the bondline.
+    </p>
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <mfrac>
+            <mrow><mo>&#x2202;</mo><mi>C</mi></mrow>
+            <mrow><mo>&#x2202;</mo><mi>t</mi></mrow>
+          </mfrac>
+          <mo>=</mo>
+          <mi>D</mi><mo stretchy="false">(</mo><mi>T</mi><mo stretchy="false">)</mo>
+          <mo>&#x2062;</mo>
+          <mfrac>
+            <mrow><msup><mo>&#x2202;</mo><mn>2</mn></msup><mi>C</mi></mrow>
+            <mrow><mo>&#x2202;</mo><msup><mi>x</mi><mn>2</mn></msup></mrow>
+          </mfrac>
+        </mrow>
+      </math>
+    </div>
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <mi>Fo</mi><mo>=</mo>
+          <mfrac>
+            <mrow><mi>D</mi><mo>&#x2062;</mo><mi>t</mi></mrow>
+            <msup><mi>&#x2113;</mi><mn>2</mn></msup>
+          </mfrac>
+        </mrow>
+      </math>
+      <div class="caption">
+        The Fourier number &mdash; dimensionless time, quoted on the snapshots below.
+        <math class="im"><mi>&#x2113;</mi></math> is the diffusion length the film
+        presents: <math class="im"><mrow><mn>2</mn><mi>L</mi></mrow></math> for a
+        film wetted on one face, <math class="im"><mi>L</mi></math> for one wetted
+        on both.
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <h3>Profiles at four stages
+          <button class="dl" data-svg="ch-prof" data-name="moisture-profiles">SVG</button></h3>
+        <p class="note">Fixed Fourier numbers, so each curve means the same stage of wetting at any thickness or temperature.</p>
+        <div class="legend" id="leg-prof"></div>
+        <div class="chartwrap"><svg class="chart" id="ch-prof" viewBox="0 0 500 300"></svg></div>
+      </div>
+      <div class="panel">
+        <h3>Watch moisture penetrate
+          <button class="dl" data-svg="ch-anim" data-name="moisture-profile-frame">SVG</button></h3>
+        <p class="note">Drag the slider to step through time, or animate it.</p>
+        <div class="animrow">
+          <label><input type="checkbox" id="anim-threshold"> Animate until the threshold</label>
+          <label><input type="checkbox" id="anim-end"> Animate to the end</label>
+        </div>
+        <p class="note" id="anim-note"></p>
+        <div class="slider-row">
+          <input type="range" id="frame" min="0" max="0" value="0" step="1">
+          <span class="readout" id="frame-readout">&mdash;</span>
+        </div>
+        <div class="chartwrap"><svg class="chart" id="ch-anim" viewBox="0 0 500 300"></svg></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:18px">
+      <h3>Uptake against time
+        <button class="dl" data-svg="ch-uptake" data-name="uptake-history">SVG</button></h3>
+      <p class="note">Film average is what a gravimetric experiment measures; the far face is what the threshold is read from.</p>
+      <div class="legend">
+        <span><i style="border-color:var(--s1)"></i>Film average M/M&#8734;</span>
+        <span><i style="border-color:var(--s2)"></i>Far face C/C&#8347;&#8336;&#8348;</span>
+        <span><i style="border-color:var(--s5);border-top-style:dashed"></i>Threshold</span>
+      </div>
+      <div class="chartwrap"><svg class="chart" id="ch-uptake" viewBox="0 0 500 260"></svg></div>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 5 ================= -->
+  <section id="s5">
+    <h2><span class="num">5</span>Thickness study</h2>
+    <p class="lead">
+      How film thickness affects penetration time. Sample points span a factor of
+      four either side of the thickness you have set, so the sweep always straddles
+      your operating point &mdash; the middle point <em>is</em> your current value.
+      The characteristic diffusion time is expected to scale as <math class="im"><mrow><msup><mi>L</mi><mn>2</mn></msup><mo>/</mo><mi>D</mi></mrow></math>, so
+      the dashed reference curve is anchored on the thinnest sample and scaled by
+      <math class="im"><msup><mi>L</mi><mn>2</mn></msup></math>; it is not fitted to
+      the data, so it provides a direct scaling comparison.
+    </p>
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <msub><mi>t</mi><mi>diffusion</mi></msub>
+          <mo>&#x223C;</mo>
+          <mfrac><msup><mi>L</mi><mn>2</mn></msup><mi>D</mi></mfrac>
+        </mrow>
+      </math>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <h3>Penetration time against thickness
+          <button class="dl" data-svg="ch-thick" data-name="thickness-study">SVG</button></h3>
+        <div class="legend">
+          <span><i style="border-color:var(--s1)"></i>Simulated</span>
+          <span><i style="border-color:var(--muted);border-top-style:dashed"></i><math class="im"><msup><mi>L</mi><mn>2</mn></msup></math> reference</span>
+        </div>
+        <div class="chartwrap"><svg class="chart" id="ch-thick" viewBox="0 0 500 300"></svg></div>
+      </div>
+      <div class="panel">
+        <h3>Thickness sweep</h3>
+        <div id="tbl-thick"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 6 ================= -->
+  <section id="s6">
+    <h2><span class="num">6</span>Diffusivity study</h2>
+    <p class="lead">
+      How water diffusivity affects penetration. The swept quantity is
+      <b>D_ref</b>, the value quoted at T_ref &mdash; what a datasheet gives and what
+      you set above. The diffusivity actually governing transport is
+      <b>D(T)</b>, larger by the Arrhenius factor, and the table reports both.
+      Sample points span a factor of 100 either side of your current D_ref. Higher
+      diffusivity means faster transport and a shorter threshold time; both axes are
+      logarithmic.
+    </p>
+    <div class="grid2">
+      <div class="panel">
+        <h3>Penetration time against reference diffusivity
+          <button class="dl" data-svg="ch-diff" data-name="diffusivity-study">SVG</button></h3>
+        <div class="chartwrap"><svg class="chart" id="ch-diff" viewBox="0 0 500 300"></svg></div>
+      </div>
+      <div class="panel">
+        <h3>Diffusivity sweep</h3>
+        <div id="tbl-diff"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 7 ================= -->
+  <section id="s7">
+    <h2><span class="num">7</span>Temperature study</h2>
+    <p class="lead">
+      Parameter sweep across the study temperature range, with the Kelvin conversion
+      and calculated diffusivity shown for every point. One of the main research
+      outputs.
+    </p>
+    <div class="panel"><div id="tbl-tstudy"></div></div>
+  </section>
+
+  <!-- ================= SECTION 8 ================= -->
+  <section id="s8">
+    <h2><span class="num">8</span>Comparison and sensitivity</h2>
+    <p class="lead">
+      Which input has the strongest effect on predicted penetration time, under this
+      model's assumptions? Values are <b>calculated</b> log-log sensitivities
+      (elasticities): the percent change in penetration time per percent change in
+      the input, by central differences at the current operating point. No
+      These values describe this model at the current operating point; they are
+      not statistical or experimental significance measures.
+    </p>
+    <div class="grid2">
+      <div class="panel">
+        <h3>Elasticity of penetration time</h3>
+        <div id="tbl-sens"></div>
+      </div>
+      <div class="panel">
+        <h3>What the exponents mean</h3>
+        <div id="sens-note"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 9 ================= -->
+  <section id="s9">
+    <h2><span class="num">9</span>Model assumptions</h2>
+    <div class="prose">
+      <ul>
+        <li>One-dimensional diffusion through the film thickness only.</li>
+        <li>Fickian diffusion, with a single diffusion coefficient.</li>
+        <li>Constant diffusivity at a given temperature &mdash; no dependence on
+            moisture concentration.</li>
+        <li>Arrhenius temperature dependence of diffusivity.</li>
+        <li>Simplified boundary conditions: the wetted face is held at equilibrium
+            with the environment from t = 0; the far face is impermeable
+            (one-sided) or a symmetry plane (two-sided).</li>
+        <li>Equilibrium uptake follows Henry's law &mdash; linear in relative
+            humidity.</li>
+        <li>Uniform, dry initial condition.</li>
+        <li>No hydrolysis model.</li>
+        <li>No plasticization model.</li>
+        <li>No glass-transition model.</li>
+        <li>No swelling and no mechanical response.</li>
+        <li>No experimentally measured adhesion-strength prediction.</li>
+        <li>The moisture threshold is a proxy for potential performance change
+            only.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= SECTION 10 ================= -->
+  <section id="s10">
+    <h2><span class="num">10</span>Export results</h2>
+    <p class="lead">
+      CSV files carry the inputs alongside the results, so a run is reproducible
+      from the file alone. Individual graphs export as SVG from the button in each
+      panel header.
+    </p>
+    <div class="panel">
+      <div style="display:flex;gap:11px;flex-wrap:wrap">
+        <button class="plain" data-export="summary">Export summary CSV</button>
+        <button class="plain" data-export="history">Export time history CSV</button>
+        <button class="plain" data-export="studies">Export parameter studies CSV</button>
+      </div>
+      <p class="note" style="margin-top:10px">
+        <b>summary</b> &mdash; every input, the calculated D(T), threshold level and
+        time, and the sensitivity exponents.<br>
+        <b>time history</b> &mdash; uptake and far-face moisture at each time sample.<br>
+        <b>parameter studies</b> &mdash; the temperature, thickness, and diffusivity
+        sweeps in one long-format table.
+      </p>
+    </div>
+  </section>
+</main>
+</div>
+
+<footer>
+  Computed by <span style="font-family:var(--mono)">hygroadh</span> &mdash; one-dimensional
+  Fickian diffusion with Arrhenius temperature dependence. The browser draws only;
+  every number is computed by the Python model and checked against exact analytical
+  solutions by its test suite.
+</footer>
+
+<script>
+"use strict";
+
+const DEFAULTS = window.__HYGROADH_DEFAULTS__ || {};
+/* Inline MathML reused from script-built prose. Kept as a constant so the markup
+   matches the equation blocks rather than drifting into ad-hoc text. */
+const L2D_INLINE = '<math class="im"><mrow><msup><mi>L</mi><mn>2</mn></msup>' +
+                   '<mo>/</mo><mi>D</mi></mrow></math>';
+const state = Object.assign({}, DEFAULTS);
+let latest = null;
+
+/* Control definitions. `tag: true` marks a model parameter rather than a
+   measured constant, which Section 1's caption explains. */
+const CONTROLS = [
+  { group: "Film", key: "thickness_um", label: "Film thickness", unit: "µm", min: 50, max: 1000,
+    step: 5, hint: "Converted to metres internally." },
+  { group: "Exposure", key: "temperature_c", label: "Temperature", unit: "°C", min: 20, max: 80,
+    step: 1, hint: "Converted to kelvin before the Arrhenius calculation." },
+  { group: "Exposure", key: "relative_humidity_pct", label: "Relative humidity", unit: "%", min: 5,
+    max: 100, step: 1,
+    hint: "Sets the equilibrium concentration at the wetted face." },
+  { group: "Transport", key: "d_ref", label: "Reference diffusivity D_ref", unit: "m²/s", log: true,
+    min: 1e-15, max: 1e-11, tag: true,
+    hint: "Value at T_ref. A model parameter, not a universal constant." },
+  { group: "Transport", key: "t_ref_c", label: "Reference temperature T_ref", unit: "°C", min: 0,
+    max: 60, step: 1, hint: "The temperature D_ref is quoted at." },
+  { group: "Transport", key: "ea_kj", label: "Activation energy Ea", unit: "kJ/mol", min: 10, max: 90,
+    step: 1, tag: true, hint: "A model parameter. 40–60 kJ/mol is typical for water in epoxy." },
+  { group: "Sorption", key: "m_ref_pct", label: "Equilibrium uptake at RH=100%", unit: "wt%", min: 0.1,
+    max: 10, step: 0.1, tag: true,
+    hint: "A model parameter. Scales linearly with humidity (Henry's law)." },
+  { group: "Moisture threshold", key: "threshold_basis", label: "Threshold basis", unit: "", choices: [
+      ["normalized", "Fraction of equilibrium"], ["wt_pct", "Absolute wt%"]],
+    hint: "Proxy criterion — NOT measured adhesion strength." },
+  { group: "Moisture threshold", key: "threshold_value", label: "Moisture threshold", unit: "", min: 0.05,
+    max: 3, step: 0.05,
+    hint: "Far-face level counted as reached. Fraction of equilibrium, or wt%." },
+  { group: "Film", key: "exposure", label: "Film geometry", unit: "", choices: [
+      ["one_sided", "One face wetted (bonded)"], ["two_sided", "Both faces wetted (free)"]],
+    hint: "One-sided puts the far face at an impermeable substrate." },
+  { group: "Simulation window", key: "duration_mode", label: "Simulation window", unit: "", choices: [
+      ["auto", "Automatic (from L²/D)"], ["manual", "Set by hand"]],
+    hint: "Automatic runs to Fourier number 1.5, near equilibrium." },
+  { group: "Simulation window", key: "duration_hours", label: "Window, if set by hand", unit: "h", log: true,
+    min: 0.01, max: 100000, hint: "Ignored while the window is automatic." },
+  { group: "Study range", key: "study_temp_min_c", label: "Study range, minimum", unit: "°C", min: 0,
+    max: 60, step: 5, hint: "Used by Sections 2 and 7." },
+  { group: "Study range", key: "study_temp_max_c", label: "Study range, maximum", unit: "°C", min: 30,
+    max: 120, step: 5, hint: "Used by Sections 2 and 7." },
+];
+
+/* ---------- formatting ---------- */
+function fmtTime(seconds) {
+  if (seconds === null || seconds === undefined || !isFinite(seconds)) return "not reached";
+  if (seconds < 90) return seconds.toFixed(1) + " s";
+  if (seconds < 5400) return (seconds / 60).toFixed(1) + " min";
+  if (seconds < 172800) return (seconds / 3600).toFixed(2) + " h";
+  if (seconds < 3.15e7) return (seconds / 86400).toFixed(2) + " d";
+  return (seconds / 3.1536e7).toFixed(2) + " yr";
+}
+function fmtHours(seconds) {
+  return (seconds === null || !isFinite(seconds)) ? "—" : (seconds / 3600).toFixed(3);
+}
+function fmtSci(x, digits) {
+  if (x === null || x === undefined || !isFinite(x)) return "—";
+  if (x === 0) return "0";
+  const exp = Math.floor(Math.log10(Math.abs(x)));
+  if (exp >= -3 && exp < 5) return x.toFixed(Math.max(0, (digits || 3) - 1 - exp));
+  return (x / Math.pow(10, exp)).toFixed(2) + "e" + exp;
+}
+function fmtNum(x, d) {
+  return (x === null || x === undefined || !isFinite(x)) ? "—"
+    : x.toFixed(d === undefined ? 3 : d);
+}
+function palette() {
+  const css = getComputedStyle(document.documentElement);
+  const get = (n) => css.getPropertyValue(n).trim() || "#888";
+  return { s1: get("--s1"), s2: get("--s2"), s3: get("--s3"), s4: get("--s4"),
+           s5: get("--s5"), ink: get("--ink"), muted: get("--muted"),
+           grid: get("--grid"), rule: get("--rule"), panel: get("--panel") };
+}
+
+/* ---------- controls ---------- */
+/* Order the fieldsets so the reader meets the film, then its environment, then
+   the model parameters, then what is being measured. */
+const GROUP_ORDER = ["Film", "Exposure", "Transport", "Sorption",
+                     "Moisture threshold", "Simulation window", "Study range"];
+
+function buildControls() {
+  const host = document.getElementById("inputs");
+  const boxes = {};
+  GROUP_ORDER.forEach(function (name) {
+    const set = document.createElement("fieldset");
+    set.className = "cgroup";
+    const legend = document.createElement("legend");
+    legend.textContent = name;
+    set.appendChild(legend);
+    host.appendChild(set);
+    boxes[name] = set;
+  });
+  CONTROLS.forEach(function (def) {
+    const wrap = document.createElement("div");
+    wrap.className = "ctl";
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = '<label for="in-' + def.key + '">' + def.label +
+      (def.tag ? ' <span class="tag">model parameter</span>' : "") +
+      '</label><span class="unit">' + (def.unit || "") + "</span>";
+    wrap.appendChild(row);
+
+    const pair = document.createElement("div");
+    pair.className = "pair";
+    if (def.choices) {
+      const sel = document.createElement("select");
+      sel.id = "in-" + def.key;
+      def.choices.forEach(function (c) {
+        const o = document.createElement("option");
+        o.value = c[0]; o.textContent = c[1];
+        sel.appendChild(o);
+      });
+      sel.value = state[def.key];
+      sel.addEventListener("change", function () {
+        state[def.key] = sel.value; onInput();
+      });
+      pair.appendChild(sel);
+      def._el = sel;
+    } else {
+      const range = document.createElement("input");
+      range.type = "range"; range.id = "in-" + def.key;
+      const num = document.createElement("input");
+      num.type = "number";
+      if (def.log) {
+        range.min = Math.log10(def.min); range.max = Math.log10(def.max);
+        range.step = 0.01; range.value = Math.log10(state[def.key]);
+        num.step = "any";
+      } else {
+        range.min = def.min; range.max = def.max; range.step = def.step;
+        range.value = state[def.key];
+        num.step = def.step;
+      }
+      num.min = def.min; num.max = def.max; num.value = state[def.key];
+      range.addEventListener("input", function () {
+        const v = def.log ? Math.pow(10, parseFloat(range.value))
+                          : parseFloat(range.value);
+        state[def.key] = v;
+        num.classList.remove("invalid");
+        num.value = def.log ? Number(v.toPrecision(4)) : v;
+        onInput();
+      });
+      /* Apply as you type, but never rewrite the box mid-keystroke. Typing "350"
+         passes through "3" and "35", both below the minimum; clamping those would
+         overwrite the field under the user's fingers. Instead an out-of-range or
+         part-typed value is marked invalid and simply not applied, and the field
+         is normalised only when focus leaves it. */
+      const applyLive = function () {
+        const v = parseFloat(num.value);
+        if (!isFinite(v) || v < def.min || v > def.max) {
+          num.classList.add("invalid");
+          return;
+        }
+        num.classList.remove("invalid");
+        state[def.key] = v;
+        range.value = def.log ? Math.log10(v) : v;
+        onInput();
+      };
+      const commit = function () {
+        let v = parseFloat(num.value);
+        if (!isFinite(v)) v = state[def.key];
+        v = Math.min(def.max, Math.max(def.min, v));
+        num.classList.remove("invalid");
+        state[def.key] = v;
+        num.value = def.log ? Number(v.toPrecision(4)) : v;
+        range.value = def.log ? Math.log10(v) : v;
+        onInput();
+      };
+      num.addEventListener("input", applyLive);
+      num.addEventListener("blur", commit);
+      num.addEventListener("keydown", function (e) { if (e.key === "Enter") commit(); });
+      pair.appendChild(range); pair.appendChild(num);
+      def._el = num; def._range = range;
+    }
+    wrap.appendChild(pair);
+    if (def.hint) {
+      const hint = document.createElement("div");
+      hint.className = "hint"; hint.textContent = def.hint;
+      wrap.appendChild(hint);
+    }
+    (boxes[def.group] || host).appendChild(wrap);
+  });
+
+  document.getElementById("reset").addEventListener("click", function () {
+    Object.assign(state, DEFAULTS);
+    CONTROLS.forEach(function (def) {
+      const v = state[def.key];
+      if (def.choices) { def._el.value = v; return; }
+      def._el.value = def.log ? Number(v.toPrecision(4)) : v;
+      def._range.value = def.log ? Math.log10(v) : v;
+      def._el.classList.remove("invalid");
+    });
+    refresh();
+  });
+  document.querySelectorAll("[data-export]").forEach(function (b) {
+    b.addEventListener("click", function () { exportCsv(b.dataset.export); });
+  });
+  document.querySelectorAll("[data-svg]").forEach(function (b) {
+    b.addEventListener("click", function () { downloadSvg(b.dataset.svg, b.dataset.name); });
+  });
+  document.getElementById("frame").addEventListener("input", function () {
+    stopPlayback();   // taking the slider by hand cancels playback
+    drawFrame();
+  });
+  document.getElementById("anim-threshold").addEventListener("change", function (e) {
+    if (!e.target.checked) { stopPlayback(); return; }
+    document.getElementById("anim-end").checked = false;
+    startPlayback("threshold");
+  });
+  document.getElementById("anim-end").addEventListener("change", function (e) {
+    if (!e.target.checked) { stopPlayback(); return; }
+    document.getElementById("anim-threshold").checked = false;
+    startPlayback("end");
+  });
+}
+
+/* ---------- chart engine ---------- */
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, text) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+function niceTicks(lo, hi, count) {
+  if (!(isFinite(lo) && isFinite(hi)) || hi <= lo) return [lo];
+  const raw = (hi - lo) / (count || 5);
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(v);
+  return out;
+}
+function logTicks(lo, hi) {
+  const out = [];
+  for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++) {
+    const v = Math.pow(10, e);
+    if (v >= lo * 0.999 && v <= hi * 1.001) out.push(v);
+  }
+  return out.length >= 2 ? out : [lo, hi];
+}
+
+/* Draw a chart. series: [{x, y, color, dash, width, marker}] */
+function chart(svgId, opts) {
+  const svg = document.getElementById(svgId);
+  svg.textContent = "";
+  const box = svg.getAttribute("viewBox").split(" ").map(Number);
+  const W = box[2], H = box[3];
+  const m = { l: 66, r: 14, t: 12, b: 46 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const p = palette();
+  const series = (opts.series || []).filter(function (s) { return s && s.x && s.x.length; });
+
+  const finite = function (v, log) {
+    return v !== null && v !== undefined && isFinite(v) && (!log || v > 0);
+  };
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  series.forEach(function (s) {
+    for (let i = 0; i < s.x.length; i++) {
+      if (!finite(s.x[i], opts.logX) || !finite(s.y[i], opts.logY)) continue;
+      x0 = Math.min(x0, s.x[i]); x1 = Math.max(x1, s.x[i]);
+      y0 = Math.min(y0, s.y[i]); y1 = Math.max(y1, s.y[i]);
+    }
+  });
+  if (opts.x0 !== undefined) x0 = opts.x0;
+  if (opts.x1 !== undefined) x1 = opts.x1;
+  if (opts.y0 !== undefined) y0 = opts.y0;
+  if (opts.y1 !== undefined) y1 = opts.y1;
+  if (!isFinite(x0) || !isFinite(y0)) {
+    svg.appendChild(el("text", { x: W / 2, y: H / 2, "text-anchor": "middle",
+      fill: p.muted, "font-size": 12 }, opts.empty || "no finite data to plot"));
+    return;
+  }
+  if (!opts.logY && y0 > 0 && opts.zeroBase !== false) y0 = 0;
+  if (y1 === y0) y1 = y0 + 1;
+  if (opts.logY) { y1 *= 1.6; y0 /= 1.6; }
+
+  const sx = function (v) {
+    return opts.logX
+      ? m.l + iw * (Math.log10(v) - Math.log10(x0)) / (Math.log10(x1 / x0) || 1)
+      : m.l + iw * (v - x0) / ((x1 - x0) || 1);
+  };
+  const sy = function (v) {
+    return opts.logY
+      ? m.t + ih * (1 - (Math.log10(v) - Math.log10(y0)) / (Math.log10(y1 / y0) || 1))
+      : m.t + ih * (1 - (v - y0) / ((y1 - y0) || 1));
+  };
+
+  const yt = opts.logY ? logTicks(y0, y1) : niceTicks(y0, y1, 5);
+  const xt = opts.logX ? logTicks(x0, x1) : niceTicks(x0, x1, 6);
+  yt.forEach(function (v) {
+    svg.appendChild(el("line", { x1: m.l, x2: W - m.r, y1: sy(v), y2: sy(v),
+      stroke: p.grid, "stroke-width": 1 }));
+    svg.appendChild(el("text", { x: m.l - 8, y: sy(v) + 3.5, "text-anchor": "end",
+      fill: p.muted, "font-size": 10, "font-family": "monospace" },
+      opts.yfmt ? opts.yfmt(v) : fmtSci(v, 3)));
+  });
+  xt.forEach(function (v) {
+    svg.appendChild(el("line", { x1: sx(v), x2: sx(v), y1: m.t, y2: m.t + ih,
+      stroke: p.grid, "stroke-width": 1 }));
+    svg.appendChild(el("text", { x: sx(v), y: H - m.b + 16, "text-anchor": "middle",
+      fill: p.muted, "font-size": 10, "font-family": "monospace" },
+      opts.xfmt ? opts.xfmt(v) : fmtSci(v, 3)));
+  });
+  svg.appendChild(el("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih,
+    stroke: p.rule, "stroke-width": 1.2 }));
+  svg.appendChild(el("line", { x1: m.l, x2: m.l, y1: m.t, y2: m.t + ih,
+    stroke: p.rule, "stroke-width": 1.2 }));
+  svg.appendChild(el("text", { x: m.l + iw / 2, y: H - 8, "text-anchor": "middle",
+    fill: p.muted, "font-size": 11.5 }, opts.xlabel || ""));
+  svg.appendChild(el("text", { x: 14, y: m.t + ih / 2, "text-anchor": "middle",
+    fill: p.muted, "font-size": 11.5,
+    transform: "rotate(-90 14 " + (m.t + ih / 2) + ")" }, opts.ylabel || ""));
+
+  (opts.hlines || []).forEach(function (h) {
+    if (!finite(h.y, opts.logY)) return;
+    svg.appendChild(el("line", { x1: m.l, x2: W - m.r, y1: sy(h.y), y2: sy(h.y),
+      stroke: h.color || p.s5, "stroke-width": 1.2, "stroke-dasharray": "5 3" }));
+    if (h.label) svg.appendChild(el("text", { x: W - m.r - 4, y: sy(h.y) - 5,
+      "text-anchor": "end", fill: h.color || p.s5, "font-size": 10 }, h.label));
+  });
+  (opts.vlines || []).forEach(function (v) {
+    if (!finite(v.x, opts.logX)) return;
+    svg.appendChild(el("line", { x1: sx(v.x), x2: sx(v.x), y1: m.t, y2: m.t + ih,
+      stroke: v.color || p.s5, "stroke-width": 1.2, "stroke-dasharray": "5 3" }));
+    if (v.label) svg.appendChild(el("text", { x: sx(v.x) + 5, y: m.t + 12,
+      fill: v.color || p.s5, "font-size": 10 }, v.label));
+  });
+
+  series.forEach(function (s) {
+    let d = "", pen = false;
+    for (let i = 0; i < s.x.length; i++) {
+      if (!finite(s.x[i], opts.logX) || !finite(s.y[i], opts.logY)) { pen = false; continue; }
+      d += (pen ? "L" : "M") + sx(s.x[i]).toFixed(2) + " " + sy(s.y[i]).toFixed(2) + " ";
+      pen = true;
+    }
+    if (d) {
+      const path = el("path", { d: d, fill: "none", stroke: s.color,
+        "stroke-width": s.width || 2, "stroke-linejoin": "round",
+        "stroke-linecap": "round" });
+      if (s.dash) path.setAttribute("stroke-dasharray", s.dash);
+      svg.appendChild(path);
+    }
+    if (s.marker) {
+      for (let i = 0; i < s.x.length; i++) {
+        if (!finite(s.x[i], opts.logX) || !finite(s.y[i], opts.logY)) continue;
+        svg.appendChild(el("circle", { cx: sx(s.x[i]), cy: sy(s.y[i]),
+          r: s.marker, fill: s.color, stroke: p.panel, "stroke-width": 1 }));
+      }
+    }
+  });
+}
+
+/* ---------- SVG export ---------- */
+function downloadSvg(id, name) {
+  const src = document.getElementById(id);
+  if (!src) return;
+  const clone = src.cloneNode(true);
+  clone.setAttribute("xmlns", SVGNS);
+  const box = src.getAttribute("viewBox").split(" ").map(Number);
+  clone.setAttribute("width", box[2]);
+  clone.setAttribute("height", box[3]);
+  const bg = el("rect", { x: 0, y: 0, width: box[2], height: box[3],
+    fill: palette().panel });
+  clone.insertBefore(bg, clone.firstChild);
+  const blob = new Blob([new XMLSerializer().serializeToString(clone)],
+                        { type: "image/svg+xml" });
+  triggerDownload(blob, name + ".svg");
+}
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+}
+async function exportCsv(kind) {
+  const btn = document.querySelector('[data-export="' + kind + '"]');
+  const label = btn.textContent;
+  btn.textContent = "Preparing…"; btn.disabled = true;
+  try {
+    const res = await fetch("/api/export/" + kind, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      banner("<b>Export failed.</b> " + (err.error || res.statusText), true);
+      return;
+    }
+    triggerDownload(await res.blob(), "hygroadh-" + kind + ".csv");
+  } catch (e) {
+    banner("<b>Export failed.</b> " + e, true);
+  } finally {
+    btn.textContent = label; btn.disabled = false;
+  }
+}
+
+/* ---------- rendering ---------- */
+function card(k, v, u, sub, calc) {
+  return '<div class="card' + (calc ? " calc" : "") + '"><div class="k">' + k +
+    '</div><div class="v">' + v + (u ? ' <span class="u">' + u + "</span>" : "") +
+    "</div>" + (sub ? '<div class="sub">' + sub + "</div>" : "") + "</div>";
+}
+function table(headers, rows, highlight) {
+  let h = "<table><tr>";
+  headers.forEach(function (x) { h += "<th>" + x + "</th>"; });
+  h += "</tr>";
+  rows.forEach(function (r, i) {
+    h += "<tr" + (highlight === i ? ' class="hi"' : "") + ">";
+    r.forEach(function (c) { h += "<td>" + c + "</td>"; });
+    h += "</tr>";
+  });
+  return h + "</table>";
+}
+
+function render(data) {
+  latest = data;
+  const inp = data.inputs, der = data.derived;
+
+  /* Section 4 */
+  document.getElementById("cards").innerHTML = [
+    card("Temperature", fmtNum(inp.temperature_c, 1), "°C",
+         fmtNum(inp.temperature_k, 2) + " K"),
+    card("Film thickness", fmtNum(inp.thickness_um, 0), "µm",
+         inp.exposure === "one_sided" ? "one face wetted" : "both faces wetted"),
+    card("Diffusivity D(T)", fmtSci(der.diffusivity, 4), "m²/s",
+         "from D_ref = " + fmtSci(inp.d_ref, 3) + " at " + fmtNum(inp.t_ref_c, 0) + " °C",
+         true),
+    card("Moisture threshold reached after", fmtTime(der.time_to_threshold_s), "",
+         der.threshold_description, true),
+    card("Equilibrium uptake", fmtNum(der.saturation_pct, 3), "wt%",
+         fmtNum(inp.m_ref_pct, 2) + " wt% at 100% RH, scaled to " +
+         fmtNum(inp.relative_humidity_pct, 0) + "%", true),
+    card("Threshold level", fmtNum(der.threshold_pct, 3), "wt%",
+         fmtNum(der.threshold_normalized * 100, 1) + "% of equilibrium", true),
+    card("Time to half uptake", fmtTime(der.time_to_half_uptake_s), "",
+         "film average", true),
+    card("Characteristic time l²/D", fmtTime(der.characteristic_time_s), "",
+         "scale for comparison", true),
+  ].join("");
+
+  if (der.threshold_note) {
+    banner("<b>Threshold cannot be reached.</b> " + der.threshold_note, false);
+  } else {
+    banner("");
+  }
+
+  const p = palette();
+  const T = data.temperature;
+
+  /* Section 2A */
+  chart("ch-dt", {
+    series: [{ x: T.curve_temperature_c, y: T.curve_diffusivity, color: p.s1 },
+             { x: [inp.temperature_c], y: [der.diffusivity], color: p.s2, marker: 4.5 }],
+    logY: true, xlabel: "Temperature (°C)", ylabel: "D(T)  (m²/s)",
+    xfmt: function (v) { return v.toFixed(0); },
+  });
+
+  /* Section 2B */
+  chart("ch-tp", {
+    series: [{ x: T.penetration_temperature_c, y: T.penetration_time_s, color: p.s2,
+               marker: 2.5 }],
+    logY: true, xlabel: "Temperature (°C)", ylabel: "Time to threshold (h)",
+    xfmt: function (v) { return v.toFixed(0); },
+    yfmt: function (v) { return fmtSci(v / 3600, 3); },
+    empty: "threshold not reached anywhere in this temperature range",
+  });
+
+  /* Section 2C */
+  const ts = data.temperature_study;
+  let current = 0, best = Infinity;
+  ts.forEach(function (r, i) {
+    const d = Math.abs(r.temperature_c - inp.temperature_c);
+    if (d < best) { best = d; current = i; }
+  });
+  document.getElementById("tbl-tcompare").innerHTML = table(
+    ["T (°C)", "T (K)", "D(T) (m²/s)", "Threshold time", "Hours"],
+    ts.map(function (r) {
+      return [fmtNum(r.temperature_c, 0), fmtNum(r.temperature_k, 2),
+              fmtSci(r.diffusivity, 4), fmtTime(r.time_to_threshold_s),
+              fmtHours(r.time_to_threshold_s)];
+    }), current);
+
+  /* Section 3 -- snapshots */
+  const prof = data.profile;
+  const colors = [p.s1, p.s3, p.s4, p.s2];
+  chart("ch-prof", {
+    series: prof.snapshots.map(function (s, i) {
+      return { x: prof.depth_um, y: s.profile, color: colors[i % colors.length] };
+    }),
+    y0: 0, y1: 1.03, xlabel: "Depth from wetted face (µm)  →  far face",
+    ylabel: "C / C\u209B\u2090\u209C", xfmt: function (v) { return v.toFixed(0); },
+    yfmt: function (v) { return v.toFixed(2); },
+  });
+  document.getElementById("leg-prof").innerHTML = prof.snapshots.map(function (s, i) {
+    return '<span><i style="border-color:' + colors[i % colors.length] + '"></i>' +
+      s.label + " — " + fmtTime(s.time_s) + " (Fo " + fmtNum(s.fourier, 3) + ")</span>";
+  }).join("");
+
+  /* Section 3 -- slider and animation */
+  const slider = document.getElementById("frame");
+  slider.max = prof.frame_time_s.length - 1;
+  if (+slider.value > +slider.max) slider.value = slider.max;
+
+  const at = prof.threshold_frame;
+  const reachable = at !== null && at !== undefined;
+  const box = document.getElementById("anim-threshold");
+  box.disabled = !reachable;
+  if (!reachable) box.checked = false;
+  document.getElementById("anim-note").textContent = reachable
+    ? "Stopping at frame " + at + " of " + slider.max +
+      " — the first sample at or after the crossing, so a shade later than the " +
+      fmtTime(der.time_to_threshold_s) + " reported above, which is interpolated."
+    : "The threshold is not reached in this window, so there is nothing to stop at.";
+
+  // An input change while animating re-runs the model and can change both the
+  // frame count and where the threshold falls; carry the playback over rather
+  // than dropping it.
+  if (playback) {
+    const stopAt = stopAtFor(playback.mode);
+    if (stopAt === null || stopAt <= 0) stopPlayback();
+    else playback.stopAt = Math.min(stopAt, slider.max);
+  }
+  drawFrame();
+
+  /* Section 3 -- uptake history */
+  const H = data.history;
+  chart("ch-uptake", {
+    series: [
+      { x: H.time_hours, y: H.uptake_normalized, color: p.s1 },
+      { x: H.time_hours, y: H.far_face_normalized, color: p.s2 },
+    ],
+    logX: true, x0: H.first_positive_hour, y0: 0, y1: 1.03,
+    xlabel: "Time (hours, log scale)", ylabel: "Normalized concentration",
+    hlines: [{ y: der.threshold_normalized, label: "threshold", color: p.s5 }],
+    yfmt: function (v) { return v.toFixed(2); },
+    xfmt: function (v) { return fmtSci(v, 2); },
+  });
+
+  /* Section 5 */
+  const th = data.thickness_study;
+  chart("ch-thick", {
+    series: [
+      { x: th.thickness_um, y: th.l_squared_reference_s, color: p.muted, dash: "6 4",
+        width: 1.5 },
+      { x: th.thickness_um, y: th.time_to_threshold_s, color: p.s1, marker: 4 },
+    ],
+    logX: true, logY: true, xlabel: "Film thickness (µm)",
+    ylabel: "Time to threshold (h)",
+    xfmt: function (v) { return v.toFixed(0); },
+    yfmt: function (v) { return fmtSci(v / 3600, 3); },
+    vlines: [{ x: inp.thickness_um, label: "your thickness" }],
+  });
+  document.getElementById("tbl-thick").innerHTML = table(
+    ["L (µm)", "Threshold time", "Hours", "L² reference (h)", "Ratio to previous"],
+    th.thickness_um.map(function (v, i) {
+      const t = th.time_to_threshold_s[i];
+      const prev = i > 0 ? th.time_to_threshold_s[i - 1] : null;
+      const ratio = (i > 0 && prev && t) ? (t / prev).toFixed(3) : "—";
+      return [fmtNum(v, 1), fmtTime(t), fmtHours(t),
+              fmtHours(th.l_squared_reference_s[i]), ratio];
+    }), Math.floor(th.thickness_um.length / 2));
+
+  /* Section 6 */
+  const df = data.diffusivity_study;
+  chart("ch-diff", {
+    series: [{ x: df.d_ref, y: df.time_to_threshold_s, color: p.s3, marker: 4 }],
+    logX: true, logY: true, xlabel: "Reference diffusivity D_ref (m²/s)",
+    ylabel: "Time to threshold (h)",
+    xfmt: function (v) { return fmtSci(v, 2); },
+    yfmt: function (v) { return fmtSci(v / 3600, 3); },
+    vlines: [{ x: inp.d_ref, label: "your D_ref" }],
+  });
+  document.getElementById("tbl-diff").innerHTML = table(
+    ["D_ref (m²/s)", "D(T) (m²/s)", "Threshold time", "Hours", "Ratio to previous"],
+    df.d_ref.map(function (v, i) {
+      const t = df.time_to_threshold_s[i];
+      const prev = i > 0 ? df.time_to_threshold_s[i - 1] : null;
+      return [fmtSci(v, 2), fmtSci(df.diffusivity_at_temperature[i], 3), fmtTime(t),
+              fmtHours(t), (i > 0 && prev && t) ? (t / prev).toFixed(4) : "—"];
+    }), Math.floor(df.d_ref.length / 2));
+
+  /* Section 7 */
+  document.getElementById("tbl-tstudy").innerHTML = table(
+    ["T (°C)", "T (K)", "D(T) (m²/s)", "Threshold time", "Hours"],
+    ts.map(function (r) {
+      return [fmtNum(r.temperature_c, 0), fmtNum(r.temperature_k, 2),
+              fmtSci(r.diffusivity, 4), fmtTime(r.time_to_threshold_s),
+              fmtHours(r.time_to_threshold_s)];
+    }), current);
+
+  /* Section 8 */
+  const sens = data.sensitivity;
+  const NAMES = { thickness: "Film thickness L", temperature_k: "Temperature T (K)",
+                  diffusivity: "Diffusivity D_ref" };
+  if (sens.elasticities) {
+    const keys = Object.keys(sens.elasticities);
+    const maxAbs = Math.max.apply(null, keys.map(function (k) {
+      return Math.abs(sens.elasticities[k]); })) || 1;
+    let rows = keys.map(function (k) {
+      const v = sens.elasticities[k];
+      return [NAMES[k] || k, (v >= 0 ? "+" : "") + fmtNum(v, 3),
+        '<span class="bar" style="width:' + (100 * Math.abs(v) / maxAbs).toFixed(1) +
+        "%;background:" + (v < 0 ? p.s2 : p.s1) + '"></span>'];
+    });
+    document.getElementById("tbl-sens").innerHTML =
+      table(["Input", "Elasticity", "Magnitude"], rows) +
+      '<p class="note" style="margin-top:9px">Response: time to threshold. ' +
+      "Central differences at ±" + (sens.relative_step * 100).toFixed(0) +
+      "%. Strongest effect: <b>" + (NAMES[sens.most_influential] ||
+      sens.most_influential) + "</b>.</p>";
+    document.getElementById("sens-note").innerHTML =
+      '<p style="font-size:13px;margin:0 0 8px">An elasticity of <b>+2</b> means ' +
+      "doubling the input multiplies the penetration time by 2² = 4.</p>" +
+      "<ul style='margin:0;padding-left:20px;font-size:13px'>" +
+      "<li><b>Thickness ≈ +2</b> and <b>diffusivity ≈ −1</b> are the signature of " +
+      "the " + L2D_INLINE + " relationship, " +
+      "recovered here numerically from the full model rather than assumed.</li>" +
+      "<li><b>Temperature</b> has a large negative elasticity because one percent " +
+      "of an absolute temperature is a few kelvin, and diffusivity depends on it " +
+      "exponentially. Per degree, it is the strongest of the three over the ranges " +
+      "studied here.</li></ul>";
+  } else {
+    document.getElementById("tbl-sens").innerHTML =
+      '<p class="note">' + (sens.error || "unavailable for these inputs") + "</p>";
+    document.getElementById("sens-note").innerHTML =
+      '<p class="note">Sensitivity needs a reachable threshold at the operating ' +
+      "point and at both perturbed points.</p>";
+  }
+
+  document.getElementById("autonote").textContent =
+    "Updates automatically ~0.2 s after any change. " +
+    "Window: " + fmtTime(inp.duration_hours * 3600) +
+    " (" + (data.study_window === "auto" ? "automatic" : "set by hand") + "). " +
+    "Studies use a window scaled to each point.";
+}
+
+/* ---------- animation ----------
+   The frames are already on the client (the profile at ~81 sampled times), so
+   playback is pure presentation: no request per frame. Time steps are log-spaced
+   like the output grid, so a constant frame rate shows the diffusion front
+   advancing smoothly rather than crawling for most of the run.
+
+   The two checkboxes are the two stop points a viewer wants, and are mutually
+   exclusive: you cannot both halt at the threshold and continue past it.
+   Checking one clears the other. */
+const FRAME_INTERVAL_MS = 90;
+let playback = null;
+
+function frameCount() {
+  return latest ? latest.profile.frames.length : 0;
+}
+function currentFrame() {
+  return parseInt(document.getElementById("frame").value, 10) || 0;
+}
+function setFrame(index) {
+  document.getElementById("frame").value = index;
+  drawFrame();
+}
+function stopAtFor(mode) {
+  if (!latest) return null;
+  if (mode === "end") return frameCount() - 1;
+  const at = latest.profile.threshold_frame;
+  return at === null || at === undefined ? null : at;
+}
+function stopPlayback() {
+  if (playback) {
+    cancelAnimationFrame(playback.raf);
+    playback = null;
+  }
+  document.getElementById("anim-threshold").checked = false;
+  document.getElementById("anim-end").checked = false;
+}
+function startPlayback(mode) {
+  const stopAt = stopAtFor(mode);
+  if (stopAt === null || stopAt <= 0) { stopPlayback(); return; }
+  if (playback) cancelAnimationFrame(playback.raf);
+  // Replay from the beginning if the slider is already at or past the stop point.
+  if (currentFrame() >= stopAt) setFrame(0);
+  playback = { mode: mode, stopAt: stopAt, last: null, spare: 0, raf: 0 };
+  playback.raf = requestAnimationFrame(tickPlayback);
+}
+function tickPlayback(now) {
+  if (!playback) return;
+  if (playback.last === null) playback.last = now;
+  playback.spare += now - playback.last;
+  playback.last = now;
+  let index = currentFrame();
+  // Advance by however many frames the elapsed time covers, so playback keeps
+  // real time even if a repaint is slow.
+  while (playback.spare >= FRAME_INTERVAL_MS && index < playback.stopAt) {
+    playback.spare -= FRAME_INTERVAL_MS;
+    index += 1;
+  }
+  setFrame(Math.min(index, playback.stopAt));
+  if (index >= playback.stopAt) { stopPlayback(); return; }
+  playback.raf = requestAnimationFrame(tickPlayback);
+}
+
+function drawFrame() {
+  if (!latest) return;
+  const prof = latest.profile;
+  const i = Math.min(prof.frames.length - 1,
+                     Math.max(0, parseInt(document.getElementById("frame").value, 10)));
+  const p = palette();
+  const at = prof.threshold_frame;
+  const reached = at !== null && at !== undefined && i >= at;
+  document.getElementById("frame-readout").textContent =
+    fmtTime(prof.frame_time_s[i]) + "  ·  Fo " + fmtNum(prof.frame_fourier[i], 4) +
+    (reached ? "  ·  threshold reached" : "");
+  chart("ch-anim", {
+    series: [{ x: prof.depth_um, y: prof.frames[i], color: p.s4, width: 2.6 }],
+    y0: 0, y1: 1.03, xlabel: "Depth from wetted face (µm)  →  far face",
+    ylabel: "C / C\u209B\u2090\u209C", xfmt: function (v) { return v.toFixed(0); },
+    yfmt: function (v) { return v.toFixed(2); },
+    hlines: [{ y: latest.derived.threshold_normalized, label: "threshold", color: p.s5 }],
+  });
+}
+
+/* ---------- transport ---------- */
+/* There is no Run button: the model is deterministic, so re-running unchanged
+   inputs can only reproduce the same numbers. Every input applies itself, and a
+   short debounce coalesces a slider drag into one request. The one case a manual
+   run legitimately covered --- retrying after a dropped request --- is handled by a
+   Retry control that appears inside the failure message. */
+let timer = null, inflight = false, pending = false, runCount = 0;
+
+function onInput() {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(function () { timer = null; refresh(); }, 220);
+}
+function banner(html, isError) {
+  document.getElementById("banner").innerHTML = html
+    ? '<div class="callout' + (isError ? " err" : "") + '">' + html + "</div>" : "";
+}
+function bannerWithRetry(html) {
+  banner(html + ' <button class="plain banner-retry" id="retry">Retry</button>', true);
+  const btn = document.getElementById("retry");
+  if (btn) btn.addEventListener("click", function () { banner(""); refresh(); });
+}
+async function refresh() {
+  if (timer) { clearTimeout(timer); timer = null; }
+  if (inflight) { pending = true; return; }
+  inflight = true;
+  document.getElementById("status").textContent = "computing…";
+  try {
+    const res = await fetch("/api/simulate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      banner("<b>Cannot run with these inputs.</b> " + (data.error || res.statusText), true);
+      document.getElementById("status").textContent = "input error — nothing recomputed";
+    } else {
+      render(data);
+      runCount += 1;
+      document.getElementById("status").textContent =
+        "run " + runCount + " at " + new Date().toLocaleTimeString() +
+        " · computed in " + data.elapsed_ms.toFixed(0) + " ms · solver: " +
+        data.derived.solver + " · 1-D Fickian, Arrhenius D(T)";
+    }
+  } catch (err) {
+    bannerWithRetry("<b>Request failed.</b> " + err +
+                    " The dashboard could not reach the model.");
+    document.getElementById("status").textContent = "offline";
+  } finally {
+    inflight = false;
+    // Never drop the last input: re-run at once rather than on a fresh debounce.
+    if (pending) { pending = false; refresh(); }
+  }
+}
+
+buildControls();
+refresh();
+if (window.matchMedia) {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",
+    function () { if (latest) render(latest); });
+}
+</script>
