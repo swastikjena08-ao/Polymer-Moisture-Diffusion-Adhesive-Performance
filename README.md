@@ -2,6 +2,8 @@
 
 **A reproducible scientific-computing project for studying moisture transport in polymer adhesive films.**
 
+![Hygroadh dashboard preview](images/dashboard-preview.png)
+
 ## Overview
 
 Moisture can change the performance of polymer adhesives, but the bondline is often the last part of a film to become wet. This project models that transport process and estimates when moisture reaches the far face of the film.
