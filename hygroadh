@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Launcher: runs the CLI however this machine happens to be set up.
+#
+# Preference order:
+#   1. the uv-managed .venv console script  (created by `uv sync`)
+#   2. the .venv interpreter
+#   3. system python3 with PYTHONPATH pointed at src/
+#
+# The third path exists because this project was developed on a box whose
+# setuptools predates PEP 660 and whose python3-venv package is missing, so
+# neither `pip install -e .` nor `python3 -m venv` works there. uv sidesteps
+# both, but the fallback keeps the CLI usable on a machine with nothing but a
+# bare python3 and numpy.
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -x "$here/.venv/bin/hygroadh" ]; then
+  exec "$here/.venv/bin/hygroadh" "$@"
+fi
+if [ -x "$here/.venv/bin/python" ]; then
+  exec "$here/.venv/bin/python" -m hygroadh.cli "$@"
+fi
+PYTHONPATH="$here/src${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m hygroadh.cli "$@"
